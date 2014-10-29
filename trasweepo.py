@@ -24,11 +24,16 @@ def initDB():
     except:
         pass
 
-# Sends a request to Google Directions API, taking a starting address, destination address and returning the JSON
+# Sends a request to MapQuest Directions API, taking a starting address, destination address and returning the JSON
 # output
 def getDirections(startingAddress, destinationAddress, apiKey):
-    apiCommand = "https://maps.googleapis.com/maps/api/directions/json?origin=" + startingAddress + "&destination=" \
-                 + destinationAddress + "&key=" + apiKey
+    # Formely used Google API, but traffic data is not free on it :-(
+    # apiCommand = "https://maps.googleapis.com/maps/api/directions/json?origin=" + startingAddress + "&destination=" \
+    #             + destinationAddress + "&key=" + apiKey
+
+    # MapQuest API much nicer in terms of being free :-)
+    apiCommand = "http://www.mapquestapi.com/directions/v2/route?key=" + apiKey + "&from=" + startingAddress + "&to=" \
+                 + destinationAddress
 
     response = urllib2.urlopen(apiCommand)
     return response
@@ -66,12 +71,12 @@ def collectData(startingAddress, destinationAddress, serverKey):
 
     # Extract trip duration from the JSON output
     data = json.load(response)
-    node = data['routes'][0]['legs'][0]['duration']['text']
+    node = data['route']['realTime']
 
     # Extract time as a numeric value
     duration = re.findall('[0-9]+', str(node))
 
-    node = data['routes'][0]['legs'][0]['distance']['text']
+    node = data['route']['distance']
 
     # Extract distance as a numeric value
     distance = re.findall('[0-9.]+', str(node))
@@ -97,6 +102,8 @@ def infiniteRunner(startingAddress, destinationAddress, serverKey):
     while counter < 210816:
         collectData(homeAddress,workAddress, serverKey)
         collectData(workAddress,homeAddress, serverKey)
+
+        # Waits 300 seconds before each query
         time.sleep(300)
         counter = counter + 1
 
@@ -104,8 +111,11 @@ def infiniteRunner(startingAddress, destinationAddress, serverKey):
 homeAddress = "72+Rock+Harbor+Lane,+Foster+City,+CA+94404"
 workAddress = "3600+Mission+College+Blvd,++Santa+Clara,+CA+95054"
 
-# Directions API server key
-serverKey = "AIzaSyC6oQWg74G15hWw5bab-EVX2BZNKz-cN3w"
+# Google Directions API server key
+#serverKey = "AIzaSyC6oQWg74G15hWw5bab-EVX2BZNKz-cN3w"
+
+# MapQuest Directions API server key
+serverKey = "Fmjtd%7Cluurnu0yn5%2C8g%3Do5-9w8l1f"
 
 # Start DB
 initDB()
