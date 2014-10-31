@@ -20,7 +20,8 @@ def initDB():
     c = conn.cursor()
     try:
         c.execute('''CREATE TABLE trafficResults
-             (month, dayOfTheWeek, day, hour, minute, origin, destination, distance, duration)''')
+             (month, dayOfTheWeek, day, hour, minute, origin, destination, distance, duration,
+             prediction  INTEGER DEFAULT 0)''')
     except:
         pass
 
@@ -84,6 +85,19 @@ def saveIntoDB(dBmonth, dbDoW, dBday, dBhour, dBminute, dBorigin, dBdestination,
         addToPredictor(dBduration, dBorigin, dBdestination, dbDoW, dbHourMinute, dbMonthDay)
         print "INFO: Record updated"
 
+    # Perform prediction
+    dbPrediction = makePrediction(dBorigin, dBdestination, dbDoW, dbHourMinute, dbMonthDay)
+
+    # Update prediction field for the entry
+    c.execute('UPDATE trafficResults SET prediction=? WHERE month=? AND day=? AND hour=? AND minute=? '
+              'AND origin=? AND destination=? AND distance=?',
+              (dbPrediction, dBmonth, dBday, dBhour, dBminute, dBorigin, dBdestination, dBdistance))
+    conn.commit()
+
+    # Print results on screen
+    print str(dBmonth) + "     " + str(dBday) + "     " + str(dBhour) + "     " + \
+          str(dBminute) + "       " + dBorigin + "  " + dBdestination + "     " + \
+          str(dBdistance) + "     " + str(dBduration) + "     " + dbDoW + "             " + str(dbPrediction)
 
 # Calls getDirections for a particular route, process the output to extract the total driving time and call saveIntoDB
 # to save the results to the database, adjusts the time stamp using roundTimeStamp.
@@ -128,9 +142,9 @@ def collectData(startingAddress, destinationAddress, serverKey):
     durationMin = int(float(duration[0]) / 60)
 
     # Save to database
-    print str(currentTime.month) + "     " + str(currentTime.day) + "     " + str(currentTime.hour) + "     " + \
-          str(roundedCurrentMinute) + "       " + str(startingAddress) + "  " + str(destinationAddress) + "     " + \
-          str(distance[0]) + "     " + str(durationMin) + "     " + dayOfWeek
+#    print str(currentTime.month) + "     " + str(currentTime.day) + "     " + str(currentTime.hour) + "     " + \
+#          str(roundedCurrentMinute) + "       " + str(startingAddress) + "  " + str(destinationAddress) + "     " + \
+#          str(distance[0]) + "     " + str(durationMin) + "     " + dayOfWeek
 
     saveIntoDB(currentTime.month, dayOfWeek, currentTime.day, currentTime.hour, roundedCurrentMinute, startingAddress,
                destinationAddress, distance[0], durationMin)
@@ -287,8 +301,25 @@ def removeFromPredictor(duration, origin, destination, dayOfTheWeek, hourMinute,
 
 # makePrediction
 # Uses data in the Predictor database to return a prediction for duration with the conditions given
-def makePrediction(duration, origin, destination, dayOfTheWeek, hourMinute, monthDay):
-    pass
+def makePrediction(origin, destination, dayOfTheWeek, hourMinute, monthDay):
+    # First, define starting values
+    topWeight = -1
+
+    # Go over every entry in the predictor database and determine which one has the highest weight for the
+    # given conditions
+    predictor.execute("SELECT Duration, "+ dayOfTheWeek + ", " + hourMinute + ", " + monthDay +
+                      " FROM predictor WHERE Origin=? AND Destination=?",
+                      (origin, destination))
+
+    rows = predictor.fetchall()
+
+    for row in rows:
+        totalWeight = row[1] + row[2] + row[3]
+        if totalWeight > topWeight:
+            topWeight = totalWeight
+            topDuration = row[0]
+
+    return topDuration
 
 # Main Flow
 homeAddress = "72+Rock+Harbor+Lane,+Foster+City,+CA+94404"
@@ -308,6 +339,6 @@ initPredictor()
 
 # Print header for terminal display
 print "MONTH  DAY    HOUR   MINUTE  ORIGIN                                      DESTINATION                 " \
-      "                          DISTANCE DURATION   DAY OF THE WEEK"
+      "                          DISTANCE DURATION   DAY OF THE WEEK     PREDICTION"
 
 infiniteRunner(homeAddress, workAddress, serverKey)
